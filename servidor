@@ -1,23 +1,42 @@
 #!/usr/bin/env python3
 import asyncio
-from tcp import Servidor
+from grader.tcp import Servidor, Conexao
 import re
+
+mensagens = []
 
 
 def validar_nome(nome):
     return re.match(br'^[a-zA-Z][a-zA-Z0-9_-]*$', nome) is not None
-
 
 def sair(conexao):
     print(conexao, 'conexão fechada')
     conexao.fechar()
 
 
-def dados_recebidos(conexao, dados):
+def dados_recebidos(conexao: Conexao, dados: bytes):
+    global mensagens
+    
     if dados == b'':
         return sair(conexao)
-    print(conexao, dados)
 
+    mensagens = dados.split(b'\r\n')
+    
+    for i, mensagem in enumerate(mensagens):
+        if i >= len(mensagens)-1:
+            break
+        
+        if b'PING' in mensagem:
+            resposta = b":server PONG server :%s\r\n:" % mensagem.split(b" ",1)[1]
+            print(resposta)
+            conexao.enviar(resposta)
+
+
+
+
+    # print("aqui1")
+    # print(conexao, dados)
+    # print("aqui2")
 
 def conexao_aceita(conexao):
     print(conexao, 'nova conexão')
