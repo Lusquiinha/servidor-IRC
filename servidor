@@ -4,6 +4,7 @@ from grader.tcp import Servidor, Conexao
 import re
 
 mensagens = []
+nickname = b'*'
 
 
 def validar_nome(nome):
@@ -16,6 +17,7 @@ def sair(conexao):
 
 def dados_recebidos(conexao: Conexao, dados: bytes):
     global mensagens
+    global nickname
     
     if dados == b'':
         return sair(conexao)
@@ -39,7 +41,16 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
             print(dados, resposta)
             conexao.enviar(resposta)
 
+        if b'NICK' in mensagem:
 
+            nome = mensagem.split(b' ', 1)[1]
+            if validar_nome(nome):
+                conexao.enviar(b':server 001 %s :Welcome\r\n' % nome)
+                conexao.enviar(b':server 422 %s :MOTD File is missing\r\n' % nome)
+            else:
+                resposta = b':server 432 %s %s :Erroneous nickname\r\n' % (nickname, nome)
+                print(mensagem, resposta, nome)
+                conexao.enviar(resposta)
 
 
     # print("aqui1")
