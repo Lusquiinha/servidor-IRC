@@ -19,16 +19,24 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
     
     if dados == b'':
         return sair(conexao)
+    
+    if not mensagens or not mensagens[-1]:
+        mensagens = dados.split(b'\r\n')
+    else:
+        temp = mensagens[-1] + dados
+        mensagens = temp.split(b'\r\n')
 
-    mensagens = dados.split(b'\r\n')
+    
     
     for i, mensagem in enumerate(mensagens):
         if i >= len(mensagens)-1:
             break
         
         if b'PING' in mensagem:
-            resposta = b":server PONG server :%s\r\n:" % mensagem.split(b" ",1)[1]
-            print(resposta)
+            
+            resposta = b":server PONG server :%s\r\n" % mensagem.split(b" ",1)[1]
+            
+            print(dados, resposta)
             conexao.enviar(resposta)
 
 
