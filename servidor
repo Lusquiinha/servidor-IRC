@@ -4,7 +4,8 @@ from grader.tcp import Servidor, Conexao
 import re
 
 mensagens = []
-nicknames = {}
+conexaoToNick = {}
+nickToConexao: dict[bytes, Conexao] = {}
 
 
 def validar_nome(nome):
@@ -17,7 +18,8 @@ def sair(conexao):
 
 def dados_recebidos(conexao: Conexao, dados: bytes):
     global mensagens
-    global nicknames
+    global conexaoToNick
+    global nickToConexao
     
     if dados == b'':
         return sair(conexao)
@@ -34,40 +36,51 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
         if i >= len(mensagens)-1:
             break
         
-        if b'PING' in mensagem:
+        print(mensagem)
+        
+        if mensagem.startswith(b'PING'):
             
-            resposta = b":server PONG server :%s\r\n" % mensagem.split(b" ",1)[1]
+            resposta = b":server PONG server :%s\r\n" % mensagem.removeprefix(b"PING ")
             
             print(dados, resposta)
             conexao.enviar(resposta)
 
-        if b'NICK' in mensagem:
-            nome = mensagem.split(b' ', 1)[1]
-            print(mensagem)
+        if mensagem.startswith(b'NICK'):
+            nome = mensagem.removeprefix(b"NICK ")
 
-            if conexao not in nicknames.keys():
-                nicknames[conexao] = b'*'
+            if conexao not in conexaoToNick.keys():
+                conexaoToNick[conexao] = b'*'
 
             if validar_nome(nome):
 
-                if nome.lower() in nicknames.values(): 
-                    resposta = b':server 433 %s %s :Nickname is already in use\r\n' % (nicknames[conexao], nome)
+                if nome.lower() in conexaoToNick.values(): 
+                    resposta = b':server 433 %s %s :Nickname is already in use\r\n' % (conexaoToNick[conexao], nome)
                     print(mensagem, resposta, nome)
                     conexao.enviar(resposta)
                 else:
-                    if nicknames[conexao] == b'*':
+                    if conexaoToNick[conexao] == b'*':
                         conexao.enviar(b':server 001 %s :Welcome\r\n' % nome)
                         conexao.enviar(b':server 422 %s :MOTD File is missing\r\n' % nome)
                     else:
-                        conexao.enviar(b":%s NICK %s\r\n" % (nicknames[conexao], nome))
+                        conexao.enviar(b":%s NICK %s\r\n" % (conexaoToNick[conexao], nome))
+                        nickToConexao.pop(conexaoToNick[conexao])
 
-                    nicknames[conexao] = nome.lower()
+                    conexaoToNick[conexao] = nome.lower()
+                    nickToConexao[nome.lower()] = conexao
             else:
-                resposta = b':server 432 %s %s :Erroneous nickname\r\n' % (nicknames[conexao], nome)
+                resposta = b':server 432 %s %s :Erroneous nickname\r\n' % (conexaoToNick[conexao], nome)
                 print(mensagem, resposta, nome)
                 conexao.enviar(resposta)
 
-
+        if mensagem.startswith(b'PRIVMSG'):
+            _, nickEnvio, msg = mensagem.split(b' ', 2)
+            resposta = b':%s PRIVMSG %s %s\r\n' % (conexaoToNick[conexao], nickEnvio.lower(), msg)
+            print(f'{resposta=}')
+            try:
+                nickToConexao[nickEnvio.lower()].enviar(resposta)
+            except:
+                print("Aconteceu exceção")
+                print(nickToConexao, conexaoToNick)
     # print("aqui1")
     # print(conexao, dados)
     # print("aqui2")
