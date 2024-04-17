@@ -39,51 +39,58 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
         print(mensagem)
         
         if mensagem.startswith(b'PING'):
-            
-            resposta = b":server PONG server :%s\r\n" % mensagem.removeprefix(b"PING ")
-            
-            print(dados, resposta)
+            ping(conexao, mensagem)   
+        elif mensagem.startswith(b'NICK'):
+            nick(conexao, mensagem)
+        elif mensagem.startswith(b'PRIVMSG'):
+            privmsg(conexao, mensagem)
+
+
+   
+
+def ping(conexao, mensagem):
+    resposta = b":server PONG server :%s\r\n" % mensagem.removeprefix(b"PING ")       
+    conexao.enviar(resposta)
+
+def nick(conexao, mensagem):
+    nome = mensagem.removeprefix(b"NICK ")
+
+    if conexao not in conexaoToNick.keys():
+        conexaoToNick[conexao] = b'*'
+
+    if validar_nome(nome):
+
+        if nome.lower() in conexaoToNick.values(): 
+            resposta = b':server 433 %s %s :Nickname is already in use\r\n' % (conexaoToNick[conexao], nome)
+            print(mensagem, resposta, nome)
             conexao.enviar(resposta)
-
-        if mensagem.startswith(b'NICK'):
-            nome = mensagem.removeprefix(b"NICK ")
-
-            if conexao not in conexaoToNick.keys():
-                conexaoToNick[conexao] = b'*'
-
-            if validar_nome(nome):
-
-                if nome.lower() in conexaoToNick.values(): 
-                    resposta = b':server 433 %s %s :Nickname is already in use\r\n' % (conexaoToNick[conexao], nome)
-                    print(mensagem, resposta, nome)
-                    conexao.enviar(resposta)
-                else:
-                    if conexaoToNick[conexao] == b'*':
-                        conexao.enviar(b':server 001 %s :Welcome\r\n' % nome)
-                        conexao.enviar(b':server 422 %s :MOTD File is missing\r\n' % nome)
-                    else:
-                        conexao.enviar(b":%s NICK %s\r\n" % (conexaoToNick[conexao], nome))
-                        nickToConexao.pop(conexaoToNick[conexao])
-
-                    conexaoToNick[conexao] = nome.lower()
-                    nickToConexao[nome.lower()] = conexao
+        else:
+            if conexaoToNick[conexao] == b'*':
+                conexao.enviar(b':server 001 %s :Welcome\r\n' % nome)
+                conexao.enviar(b':server 422 %s :MOTD File is missing\r\n' % nome)
             else:
-                resposta = b':server 432 %s %s :Erroneous nickname\r\n' % (conexaoToNick[conexao], nome)
-                print(mensagem, resposta, nome)
-                conexao.enviar(resposta)
+                conexao.enviar(b":%s NICK %s\r\n" % (conexaoToNick[conexao], nome))
+                nickToConexao.pop(conexaoToNick[conexao])
 
-        if mensagem.startswith(b'PRIVMSG'):
-            _, nickEnvio, msg = mensagem.split(b' ', 2)
-            resposta = b':%s PRIVMSG %s %s\r\n' % (conexaoToNick[conexao], nickEnvio.lower(), msg)
-            print(f'{resposta=}')
-            try:
-                nickToConexao[nickEnvio.lower()].enviar(resposta)
-            except:
-                print("Aconteceu exceção")
-                print(nickToConexao, conexaoToNick)
-    # print("aqui1")
-    # print(conexao, dados)
-    # print("aqui2")
+            conexaoToNick[conexao] = nome.lower()
+            nickToConexao[nome.lower()] = conexao
+    else:
+        resposta = b':server 432 %s %s :Erroneous nickname\r\n' % (conexaoToNick[conexao], nome)
+        print(mensagem, resposta, nome)
+        conexao.enviar(resposta)
+
+
+def privmsg(conexao, mensagem):
+    _, nickEnvio, msg = mensagem.split(b' ', 2)
+    resposta = b':%s PRIVMSG %s %s\r\n' % (conexaoToNick[conexao], nickEnvio.lower(), msg)
+    print(f'{resposta=}')
+    try:
+        nickToConexao[nickEnvio.lower()].enviar(resposta)
+    except:
+        pass
+
+def join():
+    ...
 
 def conexao_aceita(conexao):
     print(conexao, 'nova conexão')
