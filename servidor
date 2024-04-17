@@ -3,9 +3,10 @@ import asyncio
 from grader.tcp import Servidor, Conexao
 import re
 
-mensagens = []
-conexaoToNick = {}
+mensagens: list[bytes] = []
+conexaoToNick: dict[Conexao, bytes] = {}
 nickToConexao: dict[bytes, Conexao] = {}
+canais: dict[bytes, list[Conexao]]= {}
 
 
 def validar_nome(nome):
@@ -24,6 +25,7 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
     if dados == b'':
         return sair(conexao)
     
+    print(dados)
     if not mensagens or not mensagens[-1]:
         mensagens = dados.split(b'\r\n')
     else:
@@ -44,7 +46,9 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
             nick(conexao, mensagem)
         elif mensagem.startswith(b'PRIVMSG'):
             privmsg(conexao, mensagem)
-
+        elif mensagem.startswith(b'JOIN'):
+            join(conexao, mensagem)
+            # print(canais)
 
    
 
@@ -53,6 +57,9 @@ def ping(conexao, mensagem):
     conexao.enviar(resposta)
 
 def nick(conexao, mensagem):
+    global conexaoToNick
+    global nickToConexao
+
     nome = mensagem.removeprefix(b"NICK ")
 
     if conexao not in conexaoToNick.keys():
@@ -79,18 +86,41 @@ def nick(conexao, mensagem):
         print(mensagem, resposta, nome)
         conexao.enviar(resposta)
 
-
 def privmsg(conexao, mensagem):
-    _, nickEnvio, msg = mensagem.split(b' ', 2)
-    resposta = b':%s PRIVMSG %s %s\r\n' % (conexaoToNick[conexao], nickEnvio.lower(), msg)
-    print(f'{resposta=}')
-    try:
-        nickToConexao[nickEnvio.lower()].enviar(resposta)
-    except:
-        pass
+    global conexaoToNick
+    global nickToConexao
 
-def join():
-    ...
+    _, nickEnvio, msg = mensagem.split(b' ', 2)
+    try:
+        if not nickEnvio.startswith(b"#"):
+            resposta = b':%s PRIVMSG %s %s\r\n' % (conexaoToNick[conexao], nickEnvio.lower(), msg)
+            print(f'{resposta=}')
+                
+            nickToConexao[nickEnvio.lower()].enviar(resposta)
+        else:
+            resposta = b':%s PRIVMSG %s %s\r\n' % (conexaoToNick[conexao], nickEnvio.lower(), msg)
+           
+            for con in canais[nickEnvio.lower()]:
+                if con is not conexao:
+                    con.enviar(resposta) 
+    except KeyError:
+        print(f'{nickEnvio} não encontrado')
+
+
+def join(conexao: Conexao, mensagem: bytes):
+    global conexaoToNick
+    global nickToConexao
+    global canais
+    
+    nomeCanal = mensagem.removeprefix(b"JOIN ").lower()
+    if nomeCanal not in canais:
+        canais[nomeCanal] = list()
+    canais[nomeCanal].append(conexao)
+
+    resposta = b':%s JOIN :%s\r\n' % (conexaoToNick[conexao], nomeCanal)
+    conexao.enviar(resposta)
+
+    
 
 def conexao_aceita(conexao):
     print(conexao, 'nova conexão')
