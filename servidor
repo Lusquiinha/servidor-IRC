@@ -25,7 +25,6 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
     if dados == b'':
         return sair(conexao)
     
-    print(dados)
     if not mensagens or not mensagens[-1]:
         mensagens = dados.split(b'\r\n')
     else:
@@ -38,7 +37,7 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
         if i >= len(mensagens)-1:
             break
         
-        print(mensagem)
+        # print(mensagem)
         
         if mensagem.startswith(b'PING'):
             ping(conexao, mensagem)   
@@ -48,7 +47,9 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
             privmsg(conexao, mensagem)
         elif mensagem.startswith(b'JOIN'):
             join(conexao, mensagem)
-            # print(canais)
+        elif mensagem.startswith(b'PART'):
+            part(conexao, mensagem)
+            
 
    
 
@@ -69,7 +70,7 @@ def nick(conexao, mensagem):
 
         if nome.lower() in conexaoToNick.values(): 
             resposta = b':server 433 %s %s :Nickname is already in use\r\n' % (conexaoToNick[conexao], nome)
-            print(mensagem, resposta, nome)
+            
             conexao.enviar(resposta)
         else:
             if conexaoToNick[conexao] == b'*':
@@ -83,7 +84,7 @@ def nick(conexao, mensagem):
             nickToConexao[nome.lower()] = conexao
     else:
         resposta = b':server 432 %s %s :Erroneous nickname\r\n' % (conexaoToNick[conexao], nome)
-        print(mensagem, resposta, nome)
+        
         conexao.enviar(resposta)
 
 def privmsg(conexao, mensagem):
@@ -94,7 +95,6 @@ def privmsg(conexao, mensagem):
     try:
         if not nickEnvio.startswith(b"#"):
             resposta = b':%s PRIVMSG %s %s\r\n' % (conexaoToNick[conexao], nickEnvio.lower(), msg)
-            print(f'{resposta=}')
                 
             nickToConexao[nickEnvio.lower()].enviar(resposta)
         else:
@@ -105,7 +105,6 @@ def privmsg(conexao, mensagem):
                     con.enviar(resposta) 
     except KeyError:
         print(f'{nickEnvio} não encontrado')
-
 
 def join(conexao: Conexao, mensagem: bytes):
     global conexaoToNick
@@ -120,7 +119,16 @@ def join(conexao: Conexao, mensagem: bytes):
     resposta = b':%s JOIN :%s\r\n' % (conexaoToNick[conexao], nomeCanal)
     conexao.enviar(resposta)
 
+def part(conexao, mensagem):
+    global conexaoToNick
+    global nickToConexao
+    global canais
     
+    nomeCanal = mensagem.split()[1]
+    mensagem = b':%s PART %s\r\n' % (conexaoToNick[conexao], nomeCanal)
+    for con in canais[nomeCanal]:
+        con.enviar(mensagem)
+    canais[nomeCanal].remove(conexao)
 
 def conexao_aceita(conexao):
     print(conexao, 'nova conexão')
