@@ -7,12 +7,34 @@ mensagens: list[bytes] = []
 conexaoToNick: dict[Conexao, bytes] = {}
 nickToConexao: dict[bytes, Conexao] = {}
 canais: dict[bytes, list[Conexao]]= {}
+conexaoToCanais: dict[Conexao, list[bytes]] = {}
 
 
 def validar_nome(nome):
     return re.match(br'^[a-zA-Z][a-zA-Z0-9_-]*$', nome) is not None
 
 def sair(conexao):
+    global conexaoToCanais
+    try: 
+        for canal in conexaoToCanais[conexao]:
+            resposta = b':%s QUIT %s\r\n' % (conexaoToNick[conexao], canal)
+            for con in canais[canal]:
+                con.enviar(resposta)
+    except:
+        pass
+    try: 
+        temp = conexaoToNick[conexao]
+        conexaoToNick.pop(conexao)
+        nickToConexao.pop(temp)
+    except:
+        pass
+    try: 
+        temp = conexaoToCanais[conexao]
+        conexaoToCanais.pop(conexao)
+        canais[temp].remove(conexao)
+    except:
+        pass
+
     print(conexao, 'conexão fechada')
     conexao.fechar()
 
@@ -110,11 +132,15 @@ def join(conexao: Conexao, mensagem: bytes):
     global conexaoToNick
     global nickToConexao
     global canais
-    
+    global conexaoToCanais
+
     nomeCanal = mensagem.removeprefix(b"JOIN ").lower()
     if nomeCanal not in canais:
         canais[nomeCanal] = list()
     canais[nomeCanal].append(conexao)
+    if conexao not in conexaoToCanais:
+        conexaoToCanais[conexao] = list()
+    conexaoToCanais[conexao].append(nomeCanal)
 
     resposta = b':%s JOIN :%s\r\n' % (conexaoToNick[conexao], nomeCanal)
     conexao.enviar(resposta)
@@ -123,12 +149,14 @@ def part(conexao, mensagem):
     global conexaoToNick
     global nickToConexao
     global canais
-    
+    global conexaoToCanais
+
     nomeCanal = mensagem.split()[1]
     mensagem = b':%s PART %s\r\n' % (conexaoToNick[conexao], nomeCanal)
     for con in canais[nomeCanal]:
         con.enviar(mensagem)
     canais[nomeCanal].remove(conexao)
+    conexaoToCanais[conexao].remove(nomeCanal)
 
 def conexao_aceita(conexao):
     print(conexao, 'nova conexão')
