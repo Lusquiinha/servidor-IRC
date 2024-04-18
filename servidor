@@ -31,7 +31,8 @@ def sair(conexao):
     try: 
         temp = conexaoToCanais[conexao]
         conexaoToCanais.pop(conexao)
-        canais[temp].remove(conexao)
+        for canal in temp:
+            canais[canal].remove(conexao)
     except:
         pass
 
@@ -138,11 +139,21 @@ def join(conexao: Conexao, mensagem: bytes):
     if nomeCanal not in canais:
         canais[nomeCanal] = list()
     canais[nomeCanal].append(conexao)
+
     if conexao not in conexaoToCanais:
         conexaoToCanais[conexao] = list()
     conexaoToCanais[conexao].append(nomeCanal)
 
     resposta = b':%s JOIN :%s\r\n' % (conexaoToNick[conexao], nomeCanal)
+    
+    for con in canais[nomeCanal]:
+        con.enviar(resposta)
+    resposta = b':server 353 %s = %s :%s\r\n' % (conexaoToNick[conexao], nomeCanal, 
+                                             b' '.join(sorted(map(lambda c: conexaoToNick[c],canais[nomeCanal]))))
+    
+    conexao.enviar(resposta)
+    
+    resposta = b':server 366 %s %s :End of /NAMES list.\r\n' % (conexaoToNick[conexao], nomeCanal)
     conexao.enviar(resposta)
 
 def part(conexao, mensagem):
