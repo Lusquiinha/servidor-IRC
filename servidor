@@ -6,8 +6,9 @@ import re
 mensagens: list[bytes] = []
 conexaoToNick: dict[Conexao, bytes] = {}
 nickToConexao: dict[bytes, Conexao] = {}
-canais: dict[bytes, list[Conexao]]= {}
+canalToConexoes: dict[bytes, list[Conexao]]= {}
 conexaoToCanais: dict[Conexao, list[bytes]] = {}
+
 
 
 def validar_nome(nome):
@@ -18,7 +19,7 @@ def sair(conexao):
     try: 
         for canal in conexaoToCanais[conexao]:
             resposta = b':%s QUIT %s\r\n' % (conexaoToNick[conexao], canal)
-            for con in canais[canal]:
+            for con in canalToConexoes[canal]:
                 con.enviar(resposta)
     except:
         pass
@@ -32,7 +33,7 @@ def sair(conexao):
         temp = conexaoToCanais[conexao]
         conexaoToCanais.pop(conexao)
         for canal in temp:
-            canais[canal].remove(conexao)
+            canalToConexoes[canal].remove(conexao)
     except:
         pass
 
@@ -123,7 +124,7 @@ def privmsg(conexao, mensagem):
         else:
             resposta = b':%s PRIVMSG %s %s\r\n' % (conexaoToNick[conexao], nickEnvio.lower(), msg)
            
-            for con in canais[nickEnvio.lower()]:
+            for con in canalToConexoes[nickEnvio.lower()]:
                 if con is not conexao:
                     con.enviar(resposta) 
     except KeyError:
@@ -132,13 +133,13 @@ def privmsg(conexao, mensagem):
 def join(conexao: Conexao, mensagem: bytes):
     global conexaoToNick
     global nickToConexao
-    global canais
+    global canalToConexoes
     global conexaoToCanais
 
     nomeCanal = mensagem.removeprefix(b"JOIN ").lower()
-    if nomeCanal not in canais:
-        canais[nomeCanal] = list()
-    canais[nomeCanal].append(conexao)
+    if nomeCanal not in canalToConexoes:
+        canalToConexoes[nomeCanal] = list()
+    canalToConexoes[nomeCanal].append(conexao)
 
     if conexao not in conexaoToCanais:
         conexaoToCanais[conexao] = list()
@@ -146,10 +147,10 @@ def join(conexao: Conexao, mensagem: bytes):
 
     resposta = b':%s JOIN :%s\r\n' % (conexaoToNick[conexao], nomeCanal)
     
-    for con in canais[nomeCanal]:
+    for con in canalToConexoes[nomeCanal]:
         con.enviar(resposta)
     resposta = b':server 353 %s = %s :%s\r\n' % (conexaoToNick[conexao], nomeCanal, 
-                                             b' '.join(sorted(map(lambda c: conexaoToNick[c],canais[nomeCanal]))))
+                                             b' '.join(sorted(map(lambda c: conexaoToNick[c],canalToConexoes[nomeCanal]))))
     
     conexao.enviar(resposta)
     
@@ -159,14 +160,14 @@ def join(conexao: Conexao, mensagem: bytes):
 def part(conexao, mensagem):
     global conexaoToNick
     global nickToConexao
-    global canais
+    global canalToConexoes
     global conexaoToCanais
 
     nomeCanal = mensagem.split()[1]
     mensagem = b':%s PART %s\r\n' % (conexaoToNick[conexao], nomeCanal)
-    for con in canais[nomeCanal]:
+    for con in canalToConexoes[nomeCanal]:
         con.enviar(mensagem)
-    canais[nomeCanal].remove(conexao)
+    canalToConexoes[nomeCanal].remove(conexao)
     conexaoToCanais[conexao].remove(nomeCanal)
 
 def conexao_aceita(conexao):
