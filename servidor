@@ -56,7 +56,6 @@ def dados_recebidos(conexao: Conexao, dados: bytes):
         mensagens = temp.split(b'\r\n')
 
     
-    
     for i, mensagem in enumerate(mensagens):
         if i >= len(mensagens)-1:
             break
